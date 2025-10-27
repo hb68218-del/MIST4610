@@ -1,0 +1,186 @@
+# SEC College Football Stats Tracker — SQL Query Deliverable
+
+### Team Members & Task Breakdown
+---
+
+## Overview
+This project builds a **relational database** to track SEC College Football statistics for the 2024–2025 season.  
+It supports managerial insights into **team performance, referee experience, and stadium attendance**.
+
+---
+
+## Database Overview
+
+**Entities (12 total):**
+- Team  
+- Coach  
+- Player  
+- Stadium  
+- Game  
+- Referee  
+- Headreferee (Refcursive)
+- Conference  
+- Season  
+- Team_Season_Performance  
+- Game_Has_Team (junction table)  
+- Game_Has_Referee (junction table)
+
+**DBMS:** MySQL  
+**Normalization:** 3NF  
+**Relationships:**
+- One-to-Many: Team → Player  
+- Many-to-Many: Game ↔ Team (via Game_Has_Team)  
+- Many-to-Many: Game ↔ Referee (via Game_Has_Referee)
+
+---
+
+## ⚙️ SQL Queries (10 Total)
+
+### Simple Queries (4)
+
+#### 1️. Show all referees with more than 10 years of experience.
+```sql
+SELECT refereename, experience, role
+FROM referee
+WHERE experience > 10;
+Managerial Reasoning:
+Identifies veteran referees suitable for championship or high-stakes games.
+
+2️. Count the total number of referees by their role.
+sql
+Copy code
+SELECT role, COUNT(*) AS NumReferees
+FROM referee
+GROUP BY role;
+Managerial Reasoning:
+Helps HR/staffing managers understand the referee role distribution to plan hiring and promotion efforts.
+
+3️. Show the points allowed by each team (descending).
+sql
+Copy code
+SELECT teamid, pointsallowed
+FROM team_season_performance
+ORDER BY pointsallowed DESC;
+Managerial Reasoning:
+Highlights defensive weaknesses—teams allowing the most points may need defensive coaching attention.
+
+4. Show teams and their win-loss ratio (descending).
+sql
+Copy code
+SELECT teamid, wins, losses, (wins * 1.0) / losses AS WinLossRatio
+FROM team_season_performance
+ORDER BY WinLossRatio DESC;
+Managerial Reasoning:
+Assists leadership in identifying high-performing teams for recognition, sponsorship, or strategic focus.
+
+Complex Queries (6)
+5. Group referees by experience level.
+sql
+Copy code
+SELECT CASE
+         WHEN experience BETWEEN 0 AND 3 THEN 'Beginner (0–3 yrs)'
+         WHEN experience BETWEEN 4 AND 7 THEN 'Intermediate (4–7 yrs)'
+         WHEN experience BETWEEN 8 AND 12 THEN 'Advanced (8–12 yrs)'
+         ELSE 'Veteran (13+ yrs)'
+       END AS ExperienceLevel,
+       COUNT(*) AS NumReferees
+FROM referee
+GROUP BY ExperienceLevel
+ORDER BY NumReferees DESC;
+Managerial Reasoning:
+Provides insights into the workforce’s skill distribution to support training and development planning.
+
+6. Group teams by win percentage ranges.
+sql
+Copy code
+SELECT CASE
+         WHEN (wins*1.0)/(wins+losses) BETWEEN 0 AND 0.25 THEN 'Low (0–25%)'
+         WHEN (wins*1.0)/(wins+losses) BETWEEN 0.26 AND 0.5 THEN 'Moderate (26–50%)'
+         WHEN (wins*1.0)/(wins+losses) BETWEEN 0.51 AND 0.75 THEN 'High (51–75%)'
+         ELSE 'Excellent (76–100%)'
+       END AS WinCategory,
+       COUNT(*) AS NumTeams
+FROM team_season_performance
+GROUP BY WinCategory
+ORDER BY NumTeams DESC;
+Managerial Reasoning:
+Categorizes teams into tiers to guide coaching focus, marketing, and scheduling strategies.
+
+7. Show which teams gain the most yards per game.
+sql
+Copy code
+SELECT T.teamname,
+       AVG(GT.yardsgained) AS AverageYards
+FROM game_has_team AS GT
+JOIN team AS T ON T.idteam = GT.teamid
+GROUP BY T.teamname
+ORDER BY AverageYards DESC;
+Managerial Reasoning:
+Shows offensive performance by average yardage, helping identify top-performing offensive teams.
+
+8. Which stadiums draw above-average attendance?
+sql
+Copy code
+SELECT 
+    S.stadiumname,
+    S.city,
+    S.state,
+    AVG(G.attendance) AS average_attendance
+FROM games AS G
+JOIN stadium AS S 
+    ON S.stadiumid = G.stadiumid
+GROUP BY 
+    S.stadiumname, 
+    S.city, 
+    S.state
+HAVING 
+    AVG(G.attendance) > (SELECT AVG(attendance) FROM games)
+ORDER BY 
+    average_attendance DESC;
+Managerial Reasoning:
+Helps identify high-demand venues for premium pricing, future bowl games, or fan engagement strategies.
+
+9. Teams exceeding the league’s average yards per game.
+sql
+Copy code
+SELECT 
+    T.teamname,
+    AVG(GT.yardsgained) AS yards_per_game
+FROM 
+    game_has_team AS GT
+JOIN 
+    team AS T 
+    ON T.idTeam = GT.Team_idTeam
+GROUP BY 
+    T.teamname
+HAVING 
+    AVG(GT.yardsgained) > (
+        SELECT AVG(yardsgained) FROM game_has_team
+    )
+ORDER BY 
+    yards_per_game DESC;
+Managerial Reasoning:
+Identifies teams outperforming the league average offensively, supporting scouting and ranking analysis.
+
+10. Teams undefeated at their home stadium.
+sql
+Copy code
+SELECT 
+    T.teamname,
+    COUNT(*) AS home_games,
+    SUM(CASE WHEN GT.result = 'Win' THEN 1 ELSE 0 END) AS home_wins
+FROM 
+    game_has_team AS GT
+JOIN 
+    team AS T 
+    ON T.idTeam = GT.Team_idTeam
+WHERE 
+    GT.homeaway = 'Home'
+GROUP BY 
+    T.teamname
+HAVING 
+    home_games = home_wins;
+Managerial Reasoning:
+Reveals undefeated home teams—useful for ticket pricing, sponsorships, and media coverage targeting.
+
+
